@@ -1,5 +1,14 @@
 import { ENDPOINTS } from '../constants/api';
 
+// Obtiene el listado completo de clientes (GET /users).
+export const obtenerClientes = async () => {
+  const respuesta = await fetch(ENDPOINTS.usuarios);
+  if (!respuesta.ok) {
+    throw new Error('No se pudieron obtener los clientes.');
+  }
+  return respuesta.json();
+};
+
 // Transforma los campos planos del formulario al formato anidado que espera
 // la API de fakestore (donde el nombre y la dirección son objetos). Mantener el
 // estado del formulario "plano" simplifica el manejo de los inputs, y la
