@@ -54,7 +54,7 @@ const Login = () => {
             label="Nombre del administrador"
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
-            placeholder="Ej. Ignacio Gutiérrez"
+            placeholder="Ej. Juan Perez"
             required
             fullWidth
             autoFocus
