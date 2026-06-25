@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { AdminContext } from './context/AdminContext';
 import Login from './views/Login';
 import Dashboard from './views/Dashboard';
+import ListaClientes from './views/ListaClientes';
 
 const RutaProtegida = ({ children }) => {
   const { admin } = useContext(AdminContext);
@@ -23,6 +24,14 @@ function App() {
         element={
           <RutaProtegida>
             <Dashboard />
+          </RutaProtegida>
+        }
+      />
+      <Route
+        path="/clientes"
+        element={
+          <RutaProtegida>
+            <ListaClientes />
           </RutaProtegida>
         }
       />
