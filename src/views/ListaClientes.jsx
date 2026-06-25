@@ -47,7 +47,7 @@ const ListaClientes = () => {
         fullWidth
         value={busqueda}
         onChange={(e) => setBusqueda(e.target.value)}
-        sx={{ marginBottom: 3 }}
+        sx={{ marginBottom: 3, backgroundColor: '#ffffff', borderRadius: 1 }}
       />
 
       {cargando && (
