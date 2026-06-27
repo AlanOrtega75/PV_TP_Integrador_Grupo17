@@ -1,20 +1,21 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Container, Box, Card, CardContent, Stack, Typography, Button, TextField,
-  InputAdornment, Avatar, Alert, Snackbar, Skeleton, Collapse,
+  InputAdornment, Avatar, Alert, Snackbar, Skeleton,
 } from '@mui/material';
 import {
   Add as AddIcon,
   Search as SearchIcon,
   PeopleOutline as PeopleOutlineIcon,
+  ArrowForward as ArrowForwardIcon,
 } from '@mui/icons-material';
 import FormularioAltaCliente from '../components/common/FormularioAltaCliente';
-import { obtenerClientes, crearCliente } from '../services/clienteService';
+import { obtenerClientes, crearCliente, STORAGE_KEY } from '../services/clienteService';
 import { iniciales } from '../utils/formato';
 
 // Estado inicial del Snackbar de notificaciones.
 const SNACKBAR_INICIAL = { abierto: false, severidad: 'success', mensaje: '' };
-const STORAGE_KEY = 'clientes-local';
 
 const normalizarCliente = (cliente) => ({
   ...cliente,
@@ -25,11 +26,11 @@ const normalizarCliente = (cliente) => ({
 });
 
 const ListaClientes = () => {
+  const navigate = useNavigate();
   const [clientes, setClientes] = useState([]);
   const [busqueda, setBusqueda] = useState('');
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
-  const [clienteExpandido, setClienteExpandido] = useState(null);
 
   // Control del modal, del envío del POST y del aviso.
   const [modalAbierto, setModalAbierto] = useState(false);
@@ -75,10 +76,6 @@ const ListaClientes = () => {
 
   const cerrarSnackbar = () => setSnackbar((s) => ({ ...s, abierto: false }));
 
-  const alternarClienteExpandido = (id) => {
-    setClienteExpandido((actual) => (actual === id ? null : id));
-  };
-
   // Recibe los datos del formulario, dispara el POST a la API y, si todo sale
   // bien, agrega el nuevo cliente a la lista. Además lo guarda localmente para
   // que se vea inmediatamente aunque la API no persista el registro.
@@ -90,8 +87,13 @@ const ListaClientes = () => {
       name: { firstname: datosFormulario.nombre, lastname: datosFormulario.apellido },
       email: datosFormulario.email,
       phone: datosFormulario.telefono,
-      address: { city: datosFormulario.ciudad },
+      address: {
+        city: datosFormulario.ciudad,
+        street: datosFormulario.direccion,
+        zipcode: datosFormulario.codigoPostal,
+      },
       username: datosFormulario.usuario,
+      password: datosFormulario.password,
     };
 
     setClientes((anteriores) => {
@@ -199,14 +201,9 @@ const ListaClientes = () => {
                   }}
                 >
                   {clientesFiltrados.map((cliente) => {
-                    const expandido = clienteExpandido === cliente.id;
                     const nombreCompleto = `${cliente.name?.firstname || ''} ${cliente.name?.lastname || ''}`.trim();
                     const ciudad = cliente.address?.city || 'No disponible';
                     const telefono = cliente.phone || 'No disponible';
-                    const calle = cliente.address?.street || 'No disponible';
-                    const numero = cliente.address?.number || 'No disponible';
-                    const codigoPostal = cliente.address?.zipcode || 'No disponible';
-                    const usuario = cliente.username || 'No disponible';
 
                     return (
                       <Card key={cliente.id} variant="outlined" sx={{ height: '100%' }}>
@@ -236,30 +233,16 @@ const ListaClientes = () => {
                             </Stack>
                           </Box>
 
-                          <Box>
-                            <Button
-                              variant="text"
-                              size="small"
-                              sx={{ mt: 1.5, px: 0 }}
-                              onClick={() => alternarClienteExpandido(cliente.id)}
-                            >
-                              {expandido ? 'Ocultar' : 'Mostrar más'}
-                            </Button>
-
-                            <Collapse in={expandido} timeout="auto" unmountOnExit>
-                              <Stack spacing={1} sx={{ mt: 1 }}>
-                                <Typography variant="body2">
-                                  <strong>Dirección:</strong> {calle} {numero}
-                                </Typography>
-                                <Typography variant="body2">
-                                  <strong>Código Postal:</strong> {codigoPostal}
-                                </Typography>
-                                <Typography variant="body2">
-                                  <strong>Usuario:</strong> {usuario}
-                                </Typography>
-                              </Stack>
-                            </Collapse>
-                          </Box>
+                          {/* "Ver más" navega a la ficha completa del cliente. */}
+                          <Button
+                            variant="text"
+                            size="small"
+                            endIcon={<ArrowForwardIcon />}
+                            sx={{ mt: 1.5, px: 0, alignSelf: 'flex-start' }}
+                            onClick={() => navigate(`/clientes/${cliente.id}`)}
+                          >
+                            Ver más
+                          </Button>
                         </CardContent>
                       </Card>
                     );

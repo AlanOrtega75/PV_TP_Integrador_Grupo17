@@ -10,7 +10,7 @@ import {
   ArrowForward as ArrowForwardIcon,
 } from '@mui/icons-material';
 import { AdminContext } from '../context/AdminContext';
-import { obtenerClientes } from '../services/clienteService';
+import { obtenerClientesCombinados } from '../services/clienteService';
 import { COLOR_POR_SECTOR, DESCRIPCION_POR_SECTOR } from '../constants/sectores';
 
 const Dashboard = () => {
@@ -18,9 +18,9 @@ const Dashboard = () => {
   // null mientras carga la métrica; un número una vez obtenida.
   const [totalClientes, setTotalClientes] = useState(null);
 
-  // Métrica global del panel: cantidad de clientes registrados en la API.
+  // Total de clientes = API + copia local, asi tambien cuenta las altas de la app
   useEffect(() => {
-    obtenerClientes()
+    obtenerClientesCombinados()
       .then((clientes) => setTotalClientes(clientes.length))
       .catch(() => setTotalClientes(null));
   }, []);
