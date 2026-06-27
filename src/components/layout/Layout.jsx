@@ -3,10 +3,10 @@ import { Outlet, Link } from 'react-router-dom';
 import { Box, Typography, Stack, Link as MuiLink } from '@mui/material';
 import Header from './Header';
 
-const Layout = () => {
+const Layout = ({ cambiarTema, modo }) => {
   return (
     <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <Header />
+      <Header cambiarTema={cambiarTema} modo={modo}/>
       <Box component="main" sx={{ flex: 1 }}>
         <Outlet />
       </Box>

@@ -12,7 +12,7 @@ const RutaProtegida = ({ children }) => {
   return admin ? children : <Navigate to="/login" replace />;
 };
 
-function App() {
+function App({ cambiarTema, modo }) {
   const { admin } = useContext(AdminContext);
 
   return (
@@ -27,7 +27,7 @@ function App() {
       <Route
         element={
           <RutaProtegida>
-            <Layout />
+            <Layout cambiarTema={cambiarTema} modo={modo}/>
           </RutaProtegida>
         }
       >
