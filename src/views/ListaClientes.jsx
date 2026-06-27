@@ -1,25 +1,32 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Container, Box, Card, CardContent, Stack, Typography, Button, TextField,
-  InputAdornment, Table, TableBody, TableCell, TableContainer, TableHead,
-  TableRow, Paper, Avatar, Alert, Snackbar, Skeleton,
+  InputAdornment, Avatar, Alert, Snackbar, Skeleton,
 } from '@mui/material';
 import {
   Add as AddIcon,
   Search as SearchIcon,
   PeopleOutline as PeopleOutlineIcon,
+  ArrowForward as ArrowForwardIcon,
 } from '@mui/icons-material';
 import FormularioAltaCliente from '../components/common/FormularioAltaCliente';
-import { obtenerClientes, crearCliente } from '../services/clienteService';
+import { obtenerClientes, crearCliente, STORAGE_KEY } from '../services/clienteService';
 import { iniciales } from '../utils/formato';
 
 // Estado inicial del Snackbar de notificaciones.
 const SNACKBAR_INICIAL = { abierto: false, severidad: 'success', mensaje: '' };
 
-// Títulos de las columnas de la tabla.
-const COLUMNAS = ['ID', 'Cliente', 'Email', 'Teléfono', 'Ciudad'];
+const normalizarCliente = (cliente) => ({
+  ...cliente,
+  name: cliente?.name || { firstname: '', lastname: '' },
+  address: cliente?.address || {},
+  email: cliente?.email || '',
+  phone: cliente?.phone || '',
+});
 
 const ListaClientes = () => {
+  const navigate = useNavigate();
   const [clientes, setClientes] = useState([]);
   const [busqueda, setBusqueda] = useState('');
   const [cargando, setCargando] = useState(true);
@@ -34,8 +41,17 @@ const ListaClientes = () => {
     const cargarClientes = async () => {
       try {
         const datos = await obtenerClientes();
-        setClientes(datos);
+        const clientesApi = datos.map(normalizarCliente);
+        const clientesGuardados = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        const combinados = [
+          ...clientesGuardados,
+          ...clientesApi.filter((cliente) => !clientesGuardados.some((guardado) => guardado.id === cliente.id)),
+        ];
+        setClientes(combinados);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(combinados));
       } catch (err) {
+        const clientesGuardados = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        setClientes(clientesGuardados);
         setError(err.message);
       } finally {
         setCargando(false);
@@ -45,47 +61,62 @@ const ListaClientes = () => {
     cargarClientes();
   }, []);
 
+  useEffect(() => {
+    if (!cargando) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(clientes));
+    }
+  }, [clientes, cargando]);
+
   const clientesFiltrados = clientes.filter((c) => {
     const texto = busqueda.toLowerCase();
-    return (
-      c.name.lastname.toLowerCase().includes(texto) ||
-      c.address.city.toLowerCase().includes(texto)
-    );
+    const nombre = `${c.name?.firstname || ''} ${c.name?.lastname || ''}`.toLowerCase();
+    const ciudad = `${c.address?.city || ''}`.toLowerCase();
+    return nombre.includes(texto) || ciudad.includes(texto);
   });
 
   const cerrarSnackbar = () => setSnackbar((s) => ({ ...s, abierto: false }));
 
   // Recibe los datos del formulario, dispara el POST a la API y, si todo sale
-  // bien, agrega el nuevo cliente a la tabla con un id local único.
+  // bien, agrega el nuevo cliente a la lista. Además lo guarda localmente para
+  // que se vea inmediatamente aunque la API no persista el registro.
   const handleGuardarCliente = async (datosFormulario) => {
     setEnviando(true);
+
+    const nuevoCliente = {
+      id: Date.now(),
+      name: { firstname: datosFormulario.nombre, lastname: datosFormulario.apellido },
+      email: datosFormulario.email,
+      phone: datosFormulario.telefono,
+      address: {
+        city: datosFormulario.ciudad,
+        street: datosFormulario.direccion,
+        zipcode: datosFormulario.codigoPostal,
+      },
+      username: datosFormulario.usuario,
+      password: datosFormulario.password,
+    };
+
+    setClientes((anteriores) => {
+      const actualizados = [nuevoCliente, ...anteriores];
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(actualizados));
+      return actualizados;
+    });
+
+    setModalAbierto(false);
+
     try {
-      const creado = await crearCliente(datosFormulario);
-
-      // FakeStore API no persiste los datos y siempre responde { id: 1 } ante un
-      // alta. Capturamos ese id para el aviso, pero para la tabla generamos un id
-      // local único (el siguiente al mayor existente) para no romper las keys de
-      // React ni mostrar IDs repetidos.
-      setClientes((anteriores) => {
-        const idLocal = anteriores.reduce((max, c) => Math.max(max, c.id), 0) + 1;
-        const nuevoCliente = {
-          id: idLocal,
-          name: { firstname: datosFormulario.nombre, lastname: datosFormulario.apellido },
-          email: datosFormulario.email,
-          phone: datosFormulario.telefono,
-          address: { city: datosFormulario.ciudad },
-        };
-        return [nuevoCliente, ...anteriores];
-      });
-
-      setModalAbierto(false);
+      await crearCliente(datosFormulario);
       setSnackbar({
         abierto: true,
         severidad: 'success',
-        mensaje: `Cliente registrado con éxito (ID asignado por la API: ${creado.id})`,
+        mensaje: 'Cliente agregado correctamente.',
       });
     } catch (err) {
-      setSnackbar({ abierto: true, severidad: 'error', mensaje: err.message });
+      setSnackbar({
+        abierto: true,
+        severidad: 'warning',
+        mensaje: 'Cliente agregado en la vista. La API no pudo confirmar el registro.',
+      });
     } finally {
       setEnviando(false);
     }
@@ -141,65 +172,98 @@ const ListaClientes = () => {
           {error && <Alert severity="error">{error}</Alert>}
 
           {!error && (
-            <TableContainer component={Paper} variant="outlined">
-              <Table>
-                <TableHead>
-                  <TableRow sx={{ '& th': { fontWeight: 700, bgcolor: 'grey.50' } }}>
-                    {COLUMNAS.map((columna) => (
-                      <TableCell key={columna}>{columna}</TableCell>
-                    ))}
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {/* Estado de carga: filas Skeleton mientras responde la API. */}
-                  {cargando &&
-                    Array.from({ length: 5 }).map((_, fila) => (
-                      <TableRow key={fila}>
-                        {COLUMNAS.map((columna) => (
-                          <TableCell key={columna}>
-                            <Skeleton />
-                          </TableCell>
-                        ))}
-                      </TableRow>
-                    ))}
+            <Stack spacing={2}>
+              {/* Estado de carga: tarjetas Skeleton mientras responde la API. */}
+              {cargando &&
+                Array.from({ length: 5 }).map((_, fila) => (
+                  <Card key={fila} variant="outlined">
+                    <CardContent>
+                      <Stack spacing={1.5}>
+                        <Skeleton variant="circular" width={40} height={40} />
+                        <Skeleton variant="text" width="60%" />
+                        <Skeleton variant="text" width="40%" />
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                ))}
 
-                  {/* Estado de éxito: una fila por cada cliente filtrado. */}
-                  {!cargando &&
-                    clientesFiltrados.map((cliente) => (
-                      <TableRow key={cliente.id} hover>
-                        <TableCell>{cliente.id}</TableCell>
-                        <TableCell>
-                          <Stack direction="row" spacing={1.5} alignItems="center">
-                            <Avatar sx={{ width: 34, height: 34, fontSize: 14, bgcolor: 'primary.light' }}>
-                              {iniciales(cliente.name.firstname, cliente.name.lastname)}
-                            </Avatar>
-                            <Typography variant="body2">
-                              {cliente.name.firstname} {cliente.name.lastname}
-                            </Typography>
-                          </Stack>
-                        </TableCell>
-                        <TableCell>{cliente.email}</TableCell>
-                        <TableCell>{cliente.phone}</TableCell>
-                        <TableCell>{cliente.address.city}</TableCell>
-                      </TableRow>
-                    ))}
+              {/* Estado de éxito: una grilla de tarjetas por cada cliente filtrado. */}
+              {!cargando && (
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gridTemplateColumns: {
+                      xs: '1fr',
+                      sm: 'repeat(2, minmax(0, 1fr))',
+                      lg: 'repeat(4, minmax(0, 1fr))',
+                    },
+                    gap: 2,
+                  }}
+                >
+                  {clientesFiltrados.map((cliente) => {
+                    const nombreCompleto = `${cliente.name?.firstname || ''} ${cliente.name?.lastname || ''}`.trim();
+                    const ciudad = cliente.address?.city || 'No disponible';
+                    const telefono = cliente.phone || 'No disponible';
 
-                  {/* Estado vacío: la búsqueda no devolvió resultados. */}
-                  {!cargando && clientesFiltrados.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={COLUMNAS.length}>
-                        <Stack alignItems="center" spacing={1} sx={{ py: 5, color: 'text.secondary' }}>
-                          <PeopleOutlineIcon fontSize="large" />
-                          <Typography variant="body2">
-                            No se encontraron clientes.
-                          </Typography>
-                        </Stack>
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                    return (
+                      <Card key={cliente.id} variant="outlined" sx={{ height: '100%' }}>
+                        <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                          <Box>
+                            <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1.5 }}>
+                              <Avatar sx={{ width: 40, height: 40, fontSize: 15, bgcolor: 'primary.light' }}>
+                                {iniciales(cliente.name?.firstname, cliente.name?.lastname)}
+                              </Avatar>
+                              <Box>
+                                <Typography variant="subtitle2" fontWeight={600}>
+                                  {nombreCompleto || 'Cliente sin nombre'}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {cliente.email}
+                                </Typography>
+                              </Box>
+                            </Stack>
+
+                            <Stack spacing={0.5}>
+                              <Typography variant="body2">
+                                <strong>Teléfono:</strong> {telefono}
+                              </Typography>
+                              <Typography variant="body2">
+                                <strong>Ciudad:</strong> {ciudad}
+                              </Typography>
+                            </Stack>
+                          </Box>
+
+                          {/* "Ver más" navega a la ficha completa del cliente. */}
+                          <Button
+                            variant="text"
+                            size="small"
+                            endIcon={<ArrowForwardIcon />}
+                            sx={{ mt: 1.5, px: 0, alignSelf: 'flex-start' }}
+                            onClick={() => navigate(`/clientes/${cliente.id}`)}
+                          >
+                            Ver más
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </Box>
+              )}
+
+              {/* Estado vacío: la búsqueda no devolvió resultados. */}
+              {!cargando && clientesFiltrados.length === 0 && (
+                <Card variant="outlined">
+                  <CardContent>
+                    <Stack alignItems="center" spacing={1} sx={{ py: 5, color: 'text.secondary' }}>
+                      <PeopleOutlineIcon fontSize="large" />
+                      <Typography variant="body2">
+                        No se encontraron clientes.
+                      </Typography>
+                    </Stack>
+                  </CardContent>
+                </Card>
+              )}
+            </Stack>
           )}
         </CardContent>
       </Card>

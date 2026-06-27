@@ -5,6 +5,7 @@ import Layout from './components/layout/Layout';
 import Login from './views/Login';
 import Dashboard from './views/Dashboard';
 import ListaClientes from './views/ListaClientes';
+import DetalleCliente from './views/DetalleCliente';
 
 const RutaProtegida = ({ children }) => {
   const { admin } = useContext(AdminContext);
@@ -32,6 +33,7 @@ function App() {
       >
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/clientes" element={<ListaClientes />} />
+        <Route path="/clientes/:id" element={<DetalleCliente />} />
       </Route>
 
       <Route

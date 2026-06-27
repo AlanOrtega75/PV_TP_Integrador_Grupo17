@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, Button, Grid, Stack, CircularProgress,
+  TextField, Button, Grid, Stack, CircularProgress, Autocomplete,
 } from '@mui/material';
 import { PersonAdd as PersonAddIcon } from '@mui/icons-material';
 import { CLIENTE_INICIAL, CAMPOS_CLIENTE } from '../../constants/cliente';
@@ -23,9 +23,12 @@ const FormularioAltaCliente = ({ abierto, enviando, onCerrar, onGuardar }) => {
     }
   }, [abierto]);
 
+  const setCampo = (name, value) =>
+    setForm((anterior) => ({ ...anterior, [name]: value }));
+
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm((anterior) => ({ ...anterior, [name]: value }));
+    setCampo(name, value);
   };
 
   // Valida los campos obligatorios y el formato del email.
@@ -74,20 +77,53 @@ const FormularioAltaCliente = ({ abierto, enviando, onCerrar, onGuardar }) => {
 
       <DialogContent dividers>
         <Grid container spacing={2} sx={{ mt: 0 }}>
-          {CAMPOS_CLIENTE.map(({ name, label, type, requerido, autoComplete, anchoCompleto }) => (
+          {CAMPOS_CLIENTE.map(({ name, label, type, requerido, autoComplete, anchoCompleto, opciones, autocompleta }) => (
             <Grid item xs={12} sm={anchoCompleto ? 12 : 6} key={name}>
-              <TextField
-                name={name}
-                label={label}
-                type={type}
-                autoComplete={autoComplete}
-                value={form[name]}
-                onChange={handleChange}
-                required={requerido}
-                error={Boolean(errores[name])}
-                helperText={errores[name]}
-                fullWidth
-              />
+              {opciones ? (
+                <Autocomplete
+                  options={opciones}
+                  value={form[name] || null}
+                  onChange={(_, nuevoValor) => {
+                    const valor = nuevoValor || '';
+                    setForm((anterior) => ({
+                      ...anterior,
+                      [name]: valor,
+                      ...(autocompleta && { [autocompleta.campo]: autocompleta.mapa[valor] || '' }),
+                    }));
+                  }}
+                  noOptionsText="Sin coincidencias"
+                  fullWidth
+                  slotProps={{
+                    popper: {
+                      placement: 'bottom-start',
+                      modifiers: [{ name: 'flip', enabled: false }],
+                    },
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label={label}
+                      required={requerido}
+                      error={Boolean(errores[name])}
+                      helperText={errores[name]}
+                    />
+                  )}
+                />
+              ) : (
+                <TextField
+                  name={name}
+                  label={label}
+                  type={type}
+                  autoComplete={autoComplete}
+                  value={form[name]}
+                  onChange={handleChange}
+                  required={requerido}
+                  error={Boolean(errores[name])}
+                  helperText={errores[name]}
+                  fullWidth
+                  InputLabelProps={{ shrink: form[name] ? true : undefined }}
+                />
+              )}
             </Grid>
           ))}
         </Grid>
