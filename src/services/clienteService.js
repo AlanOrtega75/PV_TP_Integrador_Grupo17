@@ -86,3 +86,15 @@ export const crearCliente = async (cliente) => {
 
   return respuesta.json();
 };
+
+export const eliminarCliente = async (id) => {
+  const respuesta = await fetch(ENDPOINTS.usuario(id), {
+    method: 'DELETE',
+  });
+
+  if (!respuesta.ok) {
+    throw new Error('No se pudo eliminar el cliente.');
+  }
+
+  return respuesta.json();
+};

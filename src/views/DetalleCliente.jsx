@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Container, Card, CardContent, Box, Stack, Typography, Avatar,
@@ -15,7 +15,12 @@ import {
   Visibility as VisibilityIcon,
   VisibilityOff as VisibilityOffIcon,
 } from '@mui/icons-material';
-import { obtenerClientePorId, obtenerClientesLocales } from '../services/clienteService';
+import { AdminContext } from '../context/AdminContext';
+import {
+  obtenerClientePorId,
+  obtenerClientesLocales,
+  eliminarCliente,
+} from '../services/clienteService';
 import { iniciales } from '../utils/formato';
 
 // Fila "icon + etiqueta + valor" para cada dato de la ficha. Si viene vacio
@@ -41,6 +46,8 @@ const Dato = ({ icono, etiqueta, valor, accion }) => (
 const DetalleCliente = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { admin } = useContext(AdminContext);
+
   const [cliente, setCliente] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
@@ -51,19 +58,25 @@ const DetalleCliente = () => {
     const cargar = async () => {
       setCargando(true);
       setError(null);
+
       try {
-        // primero buscamos los clientes locales, que incluyen los que se dieron de alta en la app y no están en la API
+        // Primero buscamos los clientes locales, que incluyen los que se dieron
+        // de alta en la app y no están en la API.
         const locales = obtenerClientesLocales();
         const local = locales.find((c) => String(c.id) === String(id));
+
         if (local) {
           setCliente(local);
           return;
         }
-        // 2do. Si no estaba local, segundo fetch puntual a /users/:id.
+
+        // Si no estaba local, hacemos el fetch puntual a /users/:id.
         const datos = await obtenerClientePorId(id);
+
         if (!datos || !datos.id) {
           throw new Error('No encontramos un cliente con ese identificador.');
         }
+
         setCliente(datos);
       } catch (err) {
         setError(err.message);
@@ -76,6 +89,15 @@ const DetalleCliente = () => {
   }, [id]);
 
   const volver = () => navigate('/clientes');
+
+  const eliminar = async () => {
+    try {
+      await eliminarCliente(cliente.id);
+      navigate('/clientes');
+    } catch (err) {
+      setError(err.message);
+    }
+  };
 
   // Datos derivados, con ?. por si el cliente viene incompleto.
   const nombreCompleto = `${cliente?.name?.firstname || ''} ${cliente?.name?.lastname || ''}`.trim();
@@ -114,62 +136,76 @@ const DetalleCliente = () => {
 
       {/* Estado de exito: la ficha completa */}
       {!cargando && !error && cliente && (
-        <Card elevation={2}>
-          <CardContent sx={{ p: { xs: 2.5, sm: 4 } }}>
-            {/* Encabezado: avatar + nombre + email */}
-            <Stack direction="row" spacing={2.5} alignItems="center" sx={{ mb: 3 }}>
-              <Avatar
-                sx={{ width: 72, height: 72, fontSize: 26, bgcolor: 'primary.main' }}
+        <>
+          <Card elevation={2}>
+            <CardContent sx={{ p: { xs: 2.5, sm: 4 } }}>
+              {/* Encabezado: avatar + nombre + email */}
+              <Stack direction="row" spacing={2.5} alignItems="center" sx={{ mb: 3 }}>
+                <Avatar
+                  sx={{ width: 72, height: 72, fontSize: 26, bgcolor: 'primary.main' }}
+                >
+                  {iniciales(cliente.name?.firstname, cliente.name?.lastname)}
+                </Avatar>
+                <Box>
+                  <Typography variant="h5">
+                    {nombreCompleto || 'Cliente sin nombre'}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Cliente #{cliente.id}
+                  </Typography>
+                </Box>
+              </Stack>
+
+              <Divider sx={{ mb: 3 }} />
+
+              {/* Grilla con todos los datos del cliente */}
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' },
+                  gap: 3,
+                }}
               >
-                {iniciales(cliente.name?.firstname, cliente.name?.lastname)}
-              </Avatar>
-              <Box>
-                <Typography variant="h5">
-                  {nombreCompleto || 'Cliente sin nombre'}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Cliente #{cliente.id}
-                </Typography>
+                <Dato icono={<EmailIcon />} etiqueta="Email" valor={cliente.email} />
+                <Dato icono={<PhoneIcon />} etiqueta="Teléfono" valor={cliente.phone} />
+                <Dato icono={<LocationIcon />} etiqueta="Dirección" valor={calleYNumero} />
+                <Dato icono={<LocationIcon />} etiqueta="Ciudad" valor={direccion.city} />
+                <Dato icono={<ZipIcon />} etiqueta="Código Postal" valor={direccion.zipcode} />
+                <Dato icono={<BadgeIcon />} etiqueta="Usuario" valor={cliente.username} />
+                <Dato
+                  icono={<LockIcon />}
+                  etiqueta="Contraseña"
+                  // Tapada con viñetas hasta tocar el ojo. Sin valor, queda en "No disponible".
+                  valor={cliente.password ? (mostrarPassword ? cliente.password : '•'.repeat(8)) : ''}
+                  accion={cliente.password ? (
+                    <IconButton
+                      size="small"
+                      onClick={() => setMostrarPassword((v) => !v)}
+                      aria-label={mostrarPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                    >
+                      {mostrarPassword
+                        ? <VisibilityOffIcon fontSize="small" />
+                        : <VisibilityIcon fontSize="small" />}
+                    </IconButton>
+                  ) : null}
+                />
               </Box>
-            </Stack>
+            </CardContent>
+          </Card>
 
-            <Divider sx={{ mb: 3 }} />
-
-            {/* Grilla con todos los datos del cliente */}
-            <Box
-              sx={{
-                display: 'grid',
-                gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' },
-                gap: 3,
-              }}
-            >
-              <Dato icono={<EmailIcon />} etiqueta="Email" valor={cliente.email} />
-              <Dato icono={<PhoneIcon />} etiqueta="Teléfono" valor={cliente.phone} />
-              <Dato icono={<LocationIcon />} etiqueta="Dirección" valor={calleYNumero} />
-              <Dato icono={<LocationIcon />} etiqueta="Ciudad" valor={direccion.city} />
-              <Dato icono={<ZipIcon />} etiqueta="Código Postal" valor={direccion.zipcode} />
-              <Dato icono={<BadgeIcon />} etiqueta="Usuario" valor={cliente.username} />
-              <Dato
-                icono={<LockIcon />}
-                etiqueta="Contraseña"
-                // Tapada con viñetas hasta tocar el ojo. Sin valor, queda en "No disponible".
-                valor={cliente.password ? (mostrarPassword ? cliente.password : '•'.repeat(8)) : ''}
-                accion={cliente.password ? (
-                  <IconButton
-                    size="small"
-                    onClick={() => setMostrarPassword((v) => !v)}
-                    aria-label={mostrarPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                  >
-                    {mostrarPassword
-                      ? <VisibilityOffIcon fontSize="small" />
-                      : <VisibilityIcon fontSize="small" />}
-                  </IconButton>
-                ) : null}
-              />
+          {admin?.sector === 'Gerencia' && (
+            <Box sx={{ mt: 3 }}>
+              <Button
+                variant="contained"
+                color="error"
+                onClick={eliminar}
+              >
+                Eliminar Cliente
+              </Button>
             </Box>
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </> 
+      )}    
     </Container>
   );
 };
