@@ -105,11 +105,15 @@ const ListaClientes = () => {
     setModalAbierto(false);
 
     try {
-      await crearCliente(datosFormulario);
+      // La API devuelve el cliente creado con el id que le asigna el servidor.
+      // Lo capturamos para mostrarlo en el aviso de exito.
+      const respuestaApi = await crearCliente(datosFormulario);
       setSnackbar({
         abierto: true,
         severidad: 'success',
-        mensaje: 'Cliente agregado correctamente.',
+        mensaje: respuestaApi?.id
+          ? `Cliente agregado correctamente. ID asignado por la API: ${respuestaApi.id}`
+          : 'Cliente agregado correctamente.',
       });
     } catch (err) {
       setSnackbar({
